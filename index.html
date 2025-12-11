@@ -164,15 +164,14 @@
 
     <script>
         // --- KONFIGURASI MQTT ---
-        // PENTING: Untuk GitHub Pages (HTTPS), kita harus pakai WSS (Secure WebSocket).
-        // Broker EMQX mendukung WSS di port 1883.
+        // Broker EMQX publik yang mendukung WSS di port 8084
         const mqtt_broker = "broker.emqx.io";
         const mqtt_port = 8084; 
         const mqtt_topic = "iot/pzem/data";
         const client_id = "web_dashboard_" + Math.random().toString(16).substr(2, 8);
 
         // --- INISIALISASI CHART.JS ---
-        const maxDataPoints = 20; // Jumlah data maksimal di grafik agar tidak menumpuk
+        const maxDataPoints = 20; // Jumlah data maksimal di grafik
 
         // Grafik Daya (Watt)
         const ctxPower = document.getElementById('chartPower').getContext('2d');
@@ -187,7 +186,7 @@
                     backgroundColor: 'rgba(255, 49, 49, 0.2)',
                     borderWidth: 2,
                     fill: true,
-                    tension: 0.4 // Garis melengkung
+                    tension: 0.4 
                 }]
             },
             options: {
@@ -238,10 +237,13 @@
 
         // Callback ketika pesan masuk
         client.onMessageArrived = function (message) {
-            console.log("Data Masuk: " + message.payloadString);
+            const payload = message.payloadString;
+            console.log("Payload Masuk: " + payload);
             
             try {
-                const data = JSON.parse(message.payloadString);
+                // Pastikan format JSON yang dikirim oleh perangkat adalah:
+                // {"tegangan": 220.5, "arus": 0.5, "daya": 110.2, "energi": 1.25, "frekuensi": 50.0, "pf": 0.98}
+                const data = JSON.parse(payload);
 
                 // 1. Update Angka Digital
                 document.getElementById('disp-voltage').innerText = data.tegangan.toFixed(1);
@@ -256,14 +258,14 @@
                 updateChart(chartVoltage, data.tegangan);
 
             } catch (e) {
-                console.error("Error parsing JSON: ", e);
+                console.error("Error parsing JSON. Pastikan payload berformat JSON yang benar. Error: ", e);
             }
         };
 
         // Fungsi Update Grafik agar bergerak (scrolling)
         function updateChart(chart, value) {
             const now = new Date();
-            const timeLabel = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
+            const timeLabel = now.toTimeString().split(' ')[0]; // Ambil HH:MM:SS
 
             chart.data.labels.push(timeLabel);
             chart.data.datasets.forEach((dataset) => {
@@ -292,10 +294,11 @@
                 },
                 onFailure: function (e) {
                     console.log("Gagal Konek: " + e.errorMessage);
-                    document.getElementById("statusText").innerText = "Error";
+                    document.getElementById("statusText").innerText = "Error - Retrying in 5s";
+                    document.getElementById("statusDot").style.backgroundColor = "yellow";
                     setTimeout(connectMQTT, 5000);
                 },
-                useSSL: true // Wajib True untuk GitHub Pages
+                useSSL: true // Wajib True untuk koneksi WSS
             });
         }
 
