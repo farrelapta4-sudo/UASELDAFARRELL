@@ -3,308 +3,345 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PZEM-004T MQTT Dashboard</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
-    
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>TUGAS UAS ELDA BAGAS</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
     <style>
+        /* --- CSS MODERN STYLE --- */
         :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --text-color: #e0e0e0;
+            --bg-color: #050505;
+            --card-bg: #111111;
+            --neon-blue: #00f3ff;
             --neon-green: #00ff41;
-            --neon-blue: #00d2ff;
-            --neon-red: #ff3131;
-            --neon-yellow: #ffde00;
+            --neon-red: #ff003c;
+            --neon-yellow: #ffee00;
+            --text-glow: 0 0 10px rgba(0, 243, 255, 0.5);
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Orbitron', sans-serif; /* Font sci-fi */
             background-color: var(--bg-color);
-            color: var(--text-color);
+            color: #ffffff;
             margin: 0;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
 
         header {
             text-align: center;
             margin-bottom: 30px;
             border-bottom: 2px solid #333;
+            width: 100%;
+            max-width: 1000px;
             padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        h1 { margin: 0; letter-spacing: 2px; }
-        
-        #status {
-            font-size: 0.9rem;
-            margin-top: 5px;
-            color: #888;
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--neon-blue);
+            text-shadow: var(--text-glow);
         }
-        
+
+        /* Status Dot */
+        .status-container {
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
         .status-dot {
-            height: 10px;
-            width: 10px;
-            background-color: red;
+            height: 12px;
+            width: 12px;
+            background-color: #555;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 5px;
+            box-shadow: 0 0 5px #555;
         }
+        .status-text { color: #888; }
 
-        /* Grid Layout untuk Kartu Nilai */
+        /* --- GRID LAYOUT --- */
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 20px;
+            width: 100%;
+            max-width: 1000px;
             margin-bottom: 30px;
         }
 
         .card {
             background-color: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            transition: transform 0.2s;
+        }
+        
+        /* Efek garis scanning halus */
+        .card::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
         }
 
         .card h3 {
-            margin: 0 0 10px 0;
-            font-size: 1rem;
-            color: #aaa;
+            margin: 0;
+            font-size: 0.8rem;
+            color: #888;
+            letter-spacing: 1px;
             text-transform: uppercase;
         }
 
-        /* Gaya Tampilan Digital / 7-Segment */
-        .digital-value {
-            font-family: 'Orbitron', sans-serif; /* Font Digital */
+        /* Font Seven Segment Style */
+        .value-display {
+            font-family: 'Share Tech Mono', monospace; /* Alternatif digital yang bersih */
             font-size: 2.5rem;
-            font-weight: 700;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); /* Efek Glow */
+            margin: 10px 0;
+            font-weight: bold;
+            letter-spacing: 2px;
+            z-index: 3;
+            position: relative;
         }
 
         .unit {
-            font-size: 1rem;
-            color: #777;
-            font-family: 'Segoe UI', sans-serif;
+            font-size: 0.9rem;
+            color: #555;
+            font-weight: bold;
         }
 
-        /* Warna spesifik untuk tiap parameter */
-        .val-voltage { color: var(--neon-yellow); text-shadow: 0 0 10px var(--neon-yellow); }
-        .val-current { color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
-        .val-power { color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); }
-        .val-energy { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
-
-        /* Area Grafik */
-        .charts-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
-        }
-
+        /* Warna per parameter */
+        #val-voltage { color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
+        #val-power   { color: var(--neon-yellow); text-shadow: 0 0 10px var(--neon-yellow); }
+        #val-current { color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); }
+        #val-energy  { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
+        
+        /* --- CHART CONTAINER --- */
         .chart-wrapper {
+            width: 100%;
+            max-width: 1000px;
             background-color: var(--card-bg);
-            padding: 15px;
-            border-radius: 10px;
             border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        canvas {
+            max-height: 300px;
+        }
+
+        /* Mobile tweaks */
+        @media (max-width: 600px) {
+            .value-display { font-size: 2rem; }
+            h1 { font-size: 1.2rem; }
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>MONITORING LISTRIK (PZEM-004T)</h1>
-        <div id="status"><span class="status-dot" id="statusDot"></span>Status: <span id="statusText">Disconnected</span></div>
+        <h1>⚡ TUGAS UAS ELDA MONITORING LISTRIK MENGGUNAKAN PZEM  ⚡</h1>
+        <div class="status-container">
+            <span class="status-dot" id="dot"></span>
+            <span class="status-text" id="status-text">Disconnected</span>
+        </div>
     </header>
 
     <div class="grid-container">
         <div class="card">
             <h3>Tegangan</h3>
-            <div class="digital-value val-voltage" id="disp-voltage">0.0</div>
-            <span class="unit">Volt (V)</span>
+            <div class="value-display" id="val-voltage">000.0</div>
+            <div class="unit">VOLT (V)</div>
         </div>
+        
         <div class="card">
             <h3>Arus</h3>
-            <div class="digital-value val-current" id="disp-current">0.000</div>
-            <span class="unit">Ampere (A)</span>
+            <div class="value-display" id="val-current">0.000</div>
+            <div class="unit">AMPERE (A)</div>
         </div>
-        <div class="card">
+
+        <div class="card" style="border-color: var(--neon-yellow);">
             <h3>Daya Aktif</h3>
-            <div class="digital-value val-power" id="disp-power">0.0</div>
-            <span class="unit">Watt (W)</span>
+            <div class="value-display" id="val-power">0000</div>
+            <div class="unit">WATT (W)</div>
         </div>
+
         <div class="card">
-            <h3>Total Energi</h3>
-            <div class="digital-value val-energy" id="disp-energy">0.00</div>
-            <span class="unit">kWh</span>
+            <h3>Energi Total</h3>
+            <div class="value-display" id="val-energy">0000</div>
+            <div class="unit">kWh</div>
         </div>
+
         <div class="card">
             <h3>Frekuensi</h3>
-            <div class="digital-value" id="disp-freq" style="color: #fff;">0.0</div>
-            <span class="unit">Hz</span>
+            <div class="value-display" id="val-frek">00.0</div>
+            <div class="unit">HERTZ (Hz)</div>
         </div>
+
         <div class="card">
             <h3>Power Factor</h3>
-            <div class="digital-value" id="disp-pf" style="color: #fff;">0.00</div>
-            <span class="unit">PF</span>
+            <div class="value-display" id="val-pf">0.00</div>
+            <div class="unit">Cos Phi</div>
         </div>
     </div>
 
-    <div class="charts-container">
-        <div class="chart-wrapper">
-            <canvas id="chartPower"></canvas>
-        </div>
-        <div class="chart-wrapper">
-            <canvas id="chartVoltage"></canvas>
-        </div>
+    <div class="chart-wrapper">
+        <canvas id="powerChart"></canvas>
     </div>
 
     <script>
         // --- KONFIGURASI MQTT ---
-        // Broker EMQX publik yang mendukung WSS di port 8084
-        const mqtt_broker = "broker.emqx.io";
-        const mqtt_port = 8084; 
-        const mqtt_topic = "iot/pzem/data";
-        const client_id = "web_dashboard_" + Math.random().toString(16).substr(2, 8);
+        const broker = "broker.emqx.io";
+        const port = 8084; // WSS Port
+        const topic = "iot/pzem/data101"; 
+        const clientID = "web_modern_" + Math.random().toString(16).substr(2, 8);
+        const client = new Paho.MQTT.Client(broker, port, clientID);
 
-        // --- INISIALISASI CHART.JS ---
-        const maxDataPoints = 20; // Jumlah data maksimal di grafik
+        // --- KONFIGURASI GRAFIK (CHART.JS) ---
+        const ctx = document.getElementById('powerChart').getContext('2d');
+        
+        // Setup Gradient Warna untuk grafik
+        let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(255, 238, 0, 0.5)'); // Kuning transparan
+        gradient.addColorStop(1, 'rgba(255, 238, 0, 0)');
 
-        // Grafik Daya (Watt)
-        const ctxPower = document.getElementById('chartPower').getContext('2d');
-        const chartPower = new Chart(ctxPower, {
+        const maxDataPoints = 30; // Grafik hanya menyimpan 30 data terakhir agar ringan
+        
+        const powerChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [],
+                labels: [], // Sumbu X (Waktu)
                 datasets: [{
-                    label: 'Daya (Watt)',
-                    data: [],
-                    borderColor: '#ff3131',
-                    backgroundColor: 'rgba(255, 49, 49, 0.2)',
+                    label: 'Konsumsi Daya (Watt)',
+                    data: [], // Sumbu Y (Nilai Watt)
+                    borderColor: '#ffee00',
+                    backgroundColor: gradient,
                     borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#fff',
                     fill: true,
-                    tension: 0.4 
+                    tension: 0.4 // Membuat garis melengkung halus
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                animation: false, // Matikan animasi berat saat update real-time
                 scales: {
-                    x: { ticks: { color: '#888' }, grid: { color: '#333' } },
-                    y: { ticks: { color: '#888' }, grid: { color: '#333' }, beginAtZero: true }
+                    x: { 
+                        display: false, // Sembunyikan label waktu agar bersih
+                        grid: { display: false }
+                    },
+                    y: {
+                        grid: { color: '#333' },
+                        ticks: { color: '#888' }
+                    }
                 },
-                plugins: { legend: { labels: { color: '#fff' } } }
-            }
-        });
-
-        // Grafik Tegangan (Volt)
-        const ctxVolt = document.getElementById('chartVoltage').getContext('2d');
-        const chartVoltage = new Chart(ctxVolt, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Tegangan (Volt)',
-                    data: [],
-                    borderColor: '#ffde00',
-                    borderWidth: 2,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { ticks: { color: '#888' }, grid: { color: '#333' } },
-                    y: { ticks: { color: '#888' }, grid: { color: '#333' }, suggestedMin: 200, suggestedMax: 240 }
-                },
-                plugins: { legend: { labels: { color: '#fff' } } }
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                }
             }
         });
 
         // --- LOGIKA MQTT ---
-        const client = new Paho.MQTT.Client(mqtt_broker, mqtt_port, client_id);
 
-        // Callback ketika koneksi hilang
+        function updateStatus(isConnected) {
+            const dot = document.getElementById("dot");
+            const text = document.getElementById("status-text");
+            if (isConnected) {
+                dot.style.backgroundColor = "#00ff41";
+                dot.style.boxShadow = "0 0 10px #00ff41";
+                text.innerText = "Connected";
+                text.style.color = "#00ff41";
+            } else {
+                dot.style.backgroundColor = "#ff003c";
+                dot.style.boxShadow = "0 0 10px #ff003c";
+                text.innerText = "Disconnected";
+                text.style.color = "#ff003c";
+            }
+        }
+
         client.onConnectionLost = function (responseObject) {
-            console.log("Koneksi Hilang: " + responseObject.errorMessage);
-            document.getElementById("statusText").innerText = "Disconnected";
-            document.getElementById("statusDot").style.backgroundColor = "red";
-            // Coba konek lagi setelah 5 detik
-            setTimeout(connectMQTT, 5000);
+            updateStatus(false);
+            console.log("Koneksi hilang: " + responseObject.errorMessage);
+            // Coba reconnect setelah 5 detik
+            setTimeout(startConnection, 5000);
         };
 
-        // Callback ketika pesan masuk
         client.onMessageArrived = function (message) {
-            const payload = message.payloadString;
-            console.log("Payload Masuk: " + payload);
-            
             try {
-                // Pastikan format JSON yang dikirim oleh perangkat adalah:
-                // {"tegangan": 220.5, "arus": 0.5, "daya": 110.2, "energi": 1.25, "frekuensi": 50.0, "pf": 0.98}
-                const data = JSON.parse(payload);
+                const data = JSON.parse(message.payloadString);
+                
+                // Update Angka Digital
+                document.getElementById("val-voltage").innerText = parseFloat(data.tegangan).toFixed(1);
+                document.getElementById("val-current").innerText = parseFloat(data.arus).toFixed(3);
+                document.getElementById("val-power").innerText   = parseFloat(data.daya).toFixed(1);
+                document.getElementById("val-energy").innerText  = parseFloat(data.energi).toFixed(3); // Tampilkan 3 desimal utk kWh
+                document.getElementById("val-frek").innerText    = parseFloat(data.frekuensi).toFixed(1);
+                document.getElementById("val-pf").innerText      = parseFloat(data.pf).toFixed(2);
 
-                // 1. Update Angka Digital
-                document.getElementById('disp-voltage').innerText = data.tegangan.toFixed(1);
-                document.getElementById('disp-current').innerText = data.arus.toFixed(3);
-                document.getElementById('disp-power').innerText = data.daya.toFixed(1);
-                document.getElementById('disp-energy').innerText = data.energi.toFixed(2);
-                document.getElementById('disp-freq').innerText = data.frekuensi.toFixed(1);
-                document.getElementById('disp-pf').innerText = data.pf.toFixed(2);
-
-                // 2. Update Grafik
-                updateChart(chartPower, data.daya);
-                updateChart(chartVoltage, data.tegangan);
+                // Update Grafik
+                updateChart(data.daya);
 
             } catch (e) {
-                console.error("Error parsing JSON. Pastikan payload berformat JSON yang benar. Error: ", e);
+                console.error("Error parsing data:", e);
             }
         };
 
-        // Fungsi Update Grafik agar bergerak (scrolling)
-        function updateChart(chart, value) {
-            const now = new Date();
-            const timeLabel = now.toTimeString().split(' ')[0]; // Ambil HH:MM:SS
+        function updateChart(powerValue) {
+            const now = new Date().toLocaleTimeString();
 
-            chart.data.labels.push(timeLabel);
-            chart.data.datasets.forEach((dataset) => {
-                dataset.data.push(value);
-            });
+            // Tambah data baru
+            powerChart.data.labels.push(now);
+            powerChart.data.datasets[0].data.push(powerValue);
 
-            // Hapus data lama jika melebihi batas
-            if (chart.data.labels.length > maxDataPoints) {
-                chart.data.labels.shift();
-                chart.data.datasets.forEach((dataset) => {
-                    dataset.data.shift();
-                });
+            // Hapus data lama jika melebihi batas (FIFO)
+            if (powerChart.data.labels.length > maxDataPoints) {
+                powerChart.data.labels.shift();
+                powerChart.data.datasets[0].data.shift();
             }
-            chart.update();
+
+            powerChart.update();
         }
 
-        // Fungsi Koneksi
-        function connectMQTT() {
-            document.getElementById("statusText").innerText = "Connecting...";
+        function startConnection() {
+            document.getElementById("status-text").innerText = "Connecting...";
             client.connect({
+                useSSL: true,
+                timeout: 3,
                 onSuccess: function () {
-                    console.log("Berhasil Konek ke Broker!");
-                    document.getElementById("statusText").innerText = "Connected (Live)";
-                    document.getElementById("statusDot").style.backgroundColor = "#00ff41";
-                    client.subscribe(mqtt_topic);
+                    updateStatus(true);
+                    client.subscribe(topic);
                 },
                 onFailure: function (e) {
-                    console.log("Gagal Konek: " + e.errorMessage);
-                    document.getElementById("statusText").innerText = "Error - Retrying in 5s";
-                    document.getElementById("statusDot").style.backgroundColor = "yellow";
-                    setTimeout(connectMQTT, 5000);
-                },
-                useSSL: true // Wajib True untuk koneksi WSS
+                    updateStatus(false);
+                    console.log("Gagal konek: " + e.errorMessage);
+                    setTimeout(startConnection, 5000); // Retry loop
+                }
             });
         }
 
-        // Mulai Koneksi saat halaman dimuat
-        connectMQTT();
-
+        startConnection();
     </script>
 </body>
 </html>
